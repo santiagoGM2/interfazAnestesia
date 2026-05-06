@@ -10,7 +10,7 @@ const C = {
   agent:   '#a855f7',
   co2:     '#f59e0b',
   exp:     '#f97316',
-  pipe:    '#1e3a5f',
+  pipe:    '#2d5a8e',
   label:   '#7a93b4',
   dim:     '#2d4a6e',
   text:    '#dce8f8',
@@ -121,6 +121,42 @@ function CheckV({ cx, cy, open, dir = 'R' }: {
       <polygon
         points={`${cx - 1},${cy - 5} ${cx + 5},${cy} ${cx - 1},${cy + 5}`}
         fill={open ? col : C.bg} stroke={col} strokeWidth={1} />
+    </g>
+  )
+}
+
+// ── Pressure Relief Valve (D) ────────────────────────────────
+function PressureReliefValve({ cx, cy, active }: { cx: number; cy: number; active: boolean }) {
+  const col = active ? C.danger : C.warn
+  return (
+    <g>
+      {active && (
+        <circle cx={cx} cy={cy} r={16} fill="none" stroke={C.danger} strokeWidth={2}>
+          <animate attributeName="r" values="16;30;16" dur="0.8s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="0.7;0;0.7" dur="0.8s" repeatCount="indefinite" />
+        </circle>
+      )}
+      {/* Valve body */}
+      <circle cx={cx} cy={cy} r={16} fill={C.bg} stroke={col} strokeWidth={active ? 2.5 : 1.8} />
+      {/* Piston */}
+      <rect x={cx - 7} y={cy - 11} width={14} height={6} rx={1.5}
+        fill={active ? C.danger : C.dim} stroke={col} strokeWidth={1} />
+      {/* Stem */}
+      <line x1={cx} y1={cy - 5} x2={cx} y2={cy + 5} stroke={col} strokeWidth={1.5} />
+      {/* Spring zigzag */}
+      <polyline
+        points={`${cx - 7},${cy + 5} ${cx - 2},${cy + 10} ${cx + 2},${cy + 5} ${cx + 7},${cy + 10}`}
+        fill="none" stroke={col} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      {/* D badge */}
+      <circle cx={cx + 22} cy={cy - 22} r={8} fill={C.bg} stroke={C.label} strokeWidth={1} />
+      <Txt x={cx + 22} y={cy - 18} t="D" s={8} c={C.label} />
+      {/* Labels */}
+      <Txt x={cx + 34} y={cy - 8} t="VALV. ALIVIO" s={7.5} a="start" c={col} />
+      <Txt x={cx + 34} y={cy + 3} t="PRESIÓN" s={7.5} a="start" c={col} />
+      <Txt x={cx + 34} y={cy + 14} t="135 mmHg" s={6} a="start" c={C.dim} />
+      {active && (
+        <Txt x={cx} y={cy - 36} t="ALIVIO ACTIVO" s={7.5} c={C.danger} b />
+      )}
     </g>
   )
 }
@@ -251,7 +287,7 @@ function Bellows({ x, y, phase, prog }: {
   const lines = Math.max(2, Math.floor(bh / 9))
   return (
     <g>
-      <Txt x={x + 28} y={y - 6} t="FUELLE" s={8} c={C.label} />
+      <Txt x={x + 28} y={y - 6} t="MUELLE" s={8} c={C.label} />
       <rect x={x} y={y + (maxH - bh)} width={56} height={bh}
         rx={3} fill={C.panel} stroke="#2563eb" strokeWidth={1.5} />
       {Array.from({ length: lines }).map((_, i) => (
@@ -332,6 +368,7 @@ export function AnesthesiaDiagram() {
     fio2, fn2o, agentFraction, totalFGF,
     mode, ventPhase, breathProgress,
     canisterSaturation, ventilatorOn,
+    pressureReliefActive,
   } = useAnesthesiaStore()
 
   const flowOn = totalFGF > 0 || o2FlushActive
@@ -446,8 +483,13 @@ export function AnesthesiaDiagram() {
             <Pipe d={`M605,165 H660`} w={3} />
             {/* Through vaporizer: enters left, exits right */}
             <Pipe d={`M660,128 H760`} w={3} />
-            {/* Pressure relief (D) branch */}
-            <Pipe d={`M790,128 V85`} w={2} />
+            {/* Pressure relief (D) branch — from main line up to valve */}
+            <Pipe d={`M790,128 V69`} w={2} />
+            {/* Vent path from relief valve to muelle (dashed, always visible) */}
+            <path d={`M790,69 H845 V270`} fill="none"
+              stroke={pressureReliefActive ? C.warn : C.dim}
+              strokeWidth={pressureReliefActive ? 2 : 1.5}
+              strokeDasharray="5 3" opacity={0.75} />
             {/* Main outlet line continues */}
             <Pipe d={`M790,128 H880`} w={3} />
             {/* Outlet to patient circuit */}
@@ -648,10 +690,16 @@ export function AnesthesiaDiagram() {
             ════════════════════════════════════════════ */}
 
             {/* Pressure relief valve D */}
-            <circle cx={790} cy={85} r={12} fill={C.bg} stroke={C.warn} strokeWidth={1.5} />
-            <Txt x={790} y={89} t="D" s={9} c={C.warn} b />
-            <Txt x={820} y={82} t="VALV. ALIVIO" s={7.5} a="start" />
-            <Txt x={820} y={92} t="PRESION" s={7.5} a="start" />
+            <PressureReliefValve cx={790} cy={85} active={pressureReliefActive} />
+            {/* Animated gas flow toward muelle when relief valve opens */}
+            {pressureReliefActive && (
+              <path d={`M790,69 H845 V270`} fill="none" stroke={C.warn} strokeWidth={2.5}
+                strokeDasharray="9 5"
+                style={{ animation: 'flowMove 0.45s linear infinite' }} />
+            )}
+            {/* Vent path label */}
+            <Txt x={852} y={185} t="DESCARGA" s={6.5} c={pressureReliefActive ? C.warn : C.dim} a="start" />
+            <Txt x={852} y={195} t="→ MUELLE" s={6.5} c={pressureReliefActive ? C.warn : C.dim} a="start" />
 
             {/* Outlet check valve E */}
             <CheckV cx={835} cy={128} open={flowOn} dir="R" />

@@ -73,11 +73,16 @@ export function GasControlPanel() {
           unit="L/min" color="#22c55e" onChange={setO2Flow} />
         <SliderRow label="N₂O" value={n2oFlow} min={0} max={12} step={0.1}
           unit="L/min" color="#3b82f6" onChange={setN2oFlow}
-          disabled={failSafeActive} />
+          disabled={failSafeActive || o2Flow === 0} />
 
         {failSafeActive && (
           <div className="text-xs font-mono text-red-400 bg-red-950 border border-red-900 rounded px-2 py-1.5 mb-3 leading-snug">
             FAIL-SAFE ACTIVO — N₂O bloqueado por presion O₂ insuficiente (&lt;26 PSI)
+          </div>
+        )}
+        {o2Flow === 0 && !failSafeActive && (
+          <div className="text-xs font-mono text-amber-400 bg-amber-950 border border-amber-900 rounded px-2 py-1.5 mb-3 leading-snug">
+            N₂O BLOQUEADO — Sin flujo de O₂ no se puede administrar N₂O (riesgo hipóxico)
           </div>
         )}
 

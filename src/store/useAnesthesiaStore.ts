@@ -54,6 +54,9 @@ interface State {
   ventPhase: VentPhase
   breathProgress: number
 
+  // Pressure relief
+  pressureReliefActive: boolean
+
   // Alerts
   alerts: Alert[]
 }
@@ -86,6 +89,7 @@ const ALERT_IDS = {
   LOW_O2: 'low_o2',
   CIRCUIT_LEAK: 'circuit_leak',
   VAPORIZER_LEAK: 'vaporizer_leak',
+  PRESSURE_RELIEF: 'pressure_relief',
 }
 
 function recompute(state: Partial<State>): Partial<State> {
@@ -134,17 +138,30 @@ export const useAnesthesiaStore = create<Store>((set, get) => ({
   canisterSaturation: 0,
   ventPhase: 'off',
   breathProgress: 0,
+  pressureReliefActive: false,
   alerts: [],
 
   setO2Flow: (v) => set((s) => ({ o2Flow: v, ...recompute({ ...s, o2Flow: v }) })),
   setN2oFlow: (v) => set((s) => ({ n2oFlow: v, ...recompute({ ...s, n2oFlow: v }) })),
   setVaporizerOn: (v) => set((s) => ({ vaporizerOn: v, ...recompute({ ...s, vaporizerOn: v }) })),
   setAgentConcentration: (v) => set((s) => ({ agentConcentration: v, ...recompute({ ...s, agentConcentration: v }) })),
-  setO2FlushActive: (v) => set((s) => ({ o2FlushActive: v, ...recompute({ ...s, o2FlushActive: v }) })),
+  setO2FlushActive: (v) => set((s) => {
+    const pressureReliefActive = v && s.ventilatorOn
+    const alerts = s.alerts.filter(a => a.id !== ALERT_IDS.PRESSURE_RELIEF)
+    if (pressureReliefActive) {
+      alerts.push({ id: ALERT_IDS.PRESSURE_RELIEF, message: '⚠ VÁLV. ALIVIO PRESIÓN ACTIVA — Flush O₂ con ventilador activo genera sobrepresión', severity: 'warning', timestamp: Date.now() })
+    }
+    return { o2FlushActive: v, pressureReliefActive, ...recompute({ ...s, o2FlushActive: v }), alerts }
+  }),
   toggleVentilator: () =>
     set((s) => {
       const ventilatorOn = !s.ventilatorOn
-      return { ventilatorOn, ventPhase: ventilatorOn ? 'inspiration' : 'off', breathProgress: 0 }
+      const pressureReliefActive = s.o2FlushActive && ventilatorOn
+      const alerts = s.alerts.filter(a => a.id !== ALERT_IDS.PRESSURE_RELIEF)
+      if (pressureReliefActive) {
+        alerts.push({ id: ALERT_IDS.PRESSURE_RELIEF, message: '⚠ VÁLV. ALIVIO PRESIÓN ACTIVA — Flush O₂ con ventilador activo genera sobrepresión', severity: 'warning', timestamp: Date.now() })
+      }
+      return { ventilatorOn, ventPhase: ventilatorOn ? 'inspiration' : 'off', breathProgress: 0, pressureReliefActive, alerts }
     }),
   setTidalVolume: (v) => set({ tidalVolume: v }),
   setRespiratoryRate: (v) => set({ respiratoryRate: v }),
